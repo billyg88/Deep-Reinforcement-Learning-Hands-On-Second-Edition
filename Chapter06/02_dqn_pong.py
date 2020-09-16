@@ -19,14 +19,17 @@ MEAN_REWARD_BOUND = 19
 
 GAMMA = 0.99
 BATCH_SIZE = 32
-REPLAY_SIZE = 10000
+REPLAY_SIZE = 30_000
 LEARNING_RATE = 1e-4
-SYNC_TARGET_FRAMES = 1000
-REPLAY_START_SIZE = 10000
+SYNC_TARGET_FRAMES = 3_000
+REPLAY_START_SIZE = 15_000
 
-EPSILON_DECAY_LAST_FRAME = 150000
+EPSILON_DECAY_LAST_FRAME = 250_000
 EPSILON_START = 1.0
 EPSILON_FINAL = 0.01
+
+
+print('Params: REPLAY START SIZE', REPLAY_START_SIZE, 'DECAY LAST FRAME', EPSILON_DECAY_LAST_FRAME  )
 
 
 Experience = collections.namedtuple(
@@ -92,28 +95,29 @@ class Agent:
         return done_reward
 
 
-def calc_loss(batch, net, tgt_net, device="cpu"):
+def calc_loss(batch, net, tgt_net, device="cuda"):
+    
+    #print('Device:', device)
+      
     states, actions, rewards, dones, next_states = batch
 
-    states_v = torch.tensor(np.array(
-        states, copy=False)).to(device)
-    next_states_v = torch.tensor(np.array(
-        next_states, copy=False)).to(device)
-    actions_v = torch.tensor(actions).to(device)
-    rewards_v = torch.tensor(rewards).to(device)
+    states_v = torch.tensor(np.array(states, copy=False), dtype = torch.int64).to(device)
+    next_states_v = torch.tensor(np.array(next_states, copy=False), dtype = torch.float32).to(device)
+    actions_v = torch.tensor(actions, dtype = torch.int64).to(device)
+    rewards_v = torch.tensor(rewards, dtype = torch.int64).to(device)
     done_mask = torch.BoolTensor(dones).to(device)
 
-    state_action_values = net(states_v).gather(
-        1, actions_v.unsqueeze(-1)).squeeze(-1)
+    state_action_values = net(states_v).gather(1, actions_v.unsqueeze(-1)).squeeze(-1)
+    
     with torch.no_grad():
         next_state_values = tgt_net(next_states_v).max(1)[0]
         next_state_values[done_mask] = 0.0
         next_state_values = next_state_values.detach()
 
-    expected_state_action_values = next_state_values * GAMMA + \
-                                   rewards_v
-    return nn.MSELoss()(state_action_values,
-                        expected_state_action_values)
+    expected_state_action_values = next_state_values * GAMMA + rewards_v
+    
+    
+    return nn.MSELoss()(state_action_values,expected_state_action_values)
 
 
 if __name__ == "__main__":
@@ -124,7 +128,11 @@ if __name__ == "__main__":
                         help="Name of the environment, default=" +
                              DEFAULT_ENV_NAME)
     args = parser.parse_args()
+    
     device = torch.device("cuda" if args.cuda else "cpu")
+    
+    print(device)
+
 
     env = wrappers.make_env(args.env)
 
