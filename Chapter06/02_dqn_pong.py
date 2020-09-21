@@ -10,6 +10,7 @@ import collections
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import torch.nn.functional as F
 
 from tensorboardX import SummaryWriter
 
@@ -117,7 +118,7 @@ def calc_loss(batch, net, tgt_net, device="cuda"):
     expected_state_action_values = next_state_values * GAMMA + rewards_v
     
     
-    return nn.MSELoss()(state_action_values,expected_state_action_values)
+    return F.smooth_l1_loss(state_action_values,expected_state_action_values)
 
 
 if __name__ == "__main__":
